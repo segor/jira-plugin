@@ -36,98 +36,104 @@ public class JiraChangeLogAnnotator extends ChangeLogAnnotator {
 
     @Override
     public void annotate(Run<?, ?> run, Entry change, MarkupText text) {
-        JiraSite site = getSiteForProject(run.getParent());
+        try {
+            JiraSite site = getSiteForProject(run.getParent());
 
-        if (site == null) {
-            LOGGER.fine("not configured with Jira site");
-            return; // not configured with Jira
-        }
-
-        if (site.getDisableChangelogAnnotations()) {
-            LOGGER.info("ChangeLog annotations are disabled.\n Due to this also Related Issues won't be visible.");
-            return;
-        }
-
-        LOGGER.log(Level.FINE, "Using site: {0}", site.getUrl());
-
-        // if there's any recorded detail information, try to use that, too.
-        JiraBuildAction a = run.getAction(JiraBuildAction.class);
-
-        Set<JiraIssue> issuesToBeSaved = new LinkedHashSet<>();
-
-        Pattern pattern = site.getIssuePattern();
-
-        if (LOGGER.isLoggable(Level.FINE)) {
-            LOGGER.fine("Using issue pattern: " + pattern);
-        }
-
-        String plainText = text.getText();
-
-        Matcher m = pattern.matcher(plainText);
-
-        while (m.find()) {
-            if (m.groupCount() >= 1) {
-
-                String id = m.group(1);
-
-                if (StringUtils.isNotBlank(site.credentialsId) && !hasProjectForIssue(id, site, run)) {
-                    LOGGER.log(Level.INFO, "No known Jira project corresponding to id: ''{0}''", id);
-                    continue;
-                }
-
-                LOGGER.log(Level.FINE, "Annotating Jira id: ''{0}''", id);
-
-                URL url, alternativeUrl;
-                try {
-                    url = site.getUrl(id);
-                } catch (MalformedURLException e) {
-                    throw new AssertionError(e); // impossible
-                }
-
-                try {
-                    alternativeUrl = site.getAlternativeUrl(id);
-                    if (alternativeUrl != null) {
-                        url = alternativeUrl;
-                    }
-                } catch (MalformedURLException e) {
-                    LOGGER.log(Level.WARNING, "Failed to construct alternative URL for Jira link. " + e.getMessage());
-                    // This should not fail, since we already have an URL object. Exceptions would happen elsewhere.
-                    throw new AssertionError(e);
-                }
-
-                JiraIssue issue = null;
-                if (a != null) {
-                    issue = a.getIssue(id);
-                }
-
-                if (issue == null) {
-                    try {
-                        issue = site.getIssue(id);
-                        if (issue != null) {
-                            issuesToBeSaved.add(issue);
-                        }
-                    } catch (Exception e) {
-                        LOGGER.log(Level.FINE, "Error getting remote issue " + id, e);
-                    }
-                }
-
-                if (issue == null) {
-                    text.addMarkup(m.start(1), m.end(1), "<a href='" + url + "'>", "</a>");
-                } else {
-                    text.addMarkup(
-                            m.start(1),
-                            m.end(1),
-                            String.format("<a href='%s' tooltip='%s'>", url, Util.escape(issue.getSummary())),
-                            "</a>");
-                }
-
-            } else {
-                LOGGER.log(Level.WARNING, "The Jira pattern ''{0}'' doesn't define a capturing group!", pattern);
+            if (site == null) {
+                LOGGER.fine("not configured with Jira site");
+                return; // not configured with Jira
             }
-        }
 
-        if (!issuesToBeSaved.isEmpty()) {
-            saveIssues(run, a, issuesToBeSaved);
+            if (site.getDisableChangelogAnnotations()) {
+                LOGGER.info("ChangeLog annotations are disabled.\n Due to this also Related Issues won't be visible.");
+                return;
+            }
+
+            LOGGER.log(Level.FINE, "Using site: {0}", site.getUrl());
+
+            // if there's any recorded detail information, try to use that, too.
+            JiraBuildAction a = run.getAction(JiraBuildAction.class);
+
+            Set<JiraIssue> issuesToBeSaved = new LinkedHashSet<>();
+
+            Pattern pattern = site.getIssuePattern();
+
+            if (LOGGER.isLoggable(Level.FINE)) {
+                LOGGER.fine("Using issue pattern: " + pattern);
+            }
+
+            String plainText = text.getText();
+
+            Matcher m = pattern.matcher(plainText);
+
+            while (m.find()) {
+                if (m.groupCount() >= 1) {
+
+                    String id = m.group(1);
+
+                    if (StringUtils.isNotBlank(site.credentialsId) && !hasProjectForIssue(id, site, run)) {
+                        LOGGER.log(Level.INFO, "No known Jira project corresponding to id: ''{0}''", id);
+                        continue;
+                    }
+
+                    LOGGER.log(Level.FINE, "Annotating Jira id: ''{0}''", id);
+
+                    URL url, alternativeUrl;
+                    try {
+                        url = site.getUrl(id);
+                    } catch (MalformedURLException e) {
+                        throw new AssertionError(e); // impossible
+                    }
+
+                    try {
+                        alternativeUrl = site.getAlternativeUrl(id);
+                        if (alternativeUrl != null) {
+                            url = alternativeUrl;
+                        }
+                    } catch (MalformedURLException e) {
+                        LOGGER.log(Level.WARNING, "Failed to construct alternative URL for Jira link. " + e.getMessage());
+                        // This should not fail, since we already have an URL object. Exceptions would happen elsewhere.
+                        throw new AssertionError(e);
+                    }
+
+                    JiraIssue issue = null;
+                    if (a != null) {
+                        issue = a.getIssue(id);
+                    }
+
+                    if (issue == null) {
+                        try {
+                            issue = site.getIssue(id);
+                            if (issue != null) {
+                                issuesToBeSaved.add(issue);
+                            }
+                        } catch (Exception e) {
+                            LOGGER.log(Level.FINE, "Error getting remote issue " + id, e);
+                        }
+                    }
+
+                    if (issue == null) {
+                        text.addMarkup(m.start(1), m.end(1), "<a href='" + url + "'>", "</a>");
+                    } else {
+                        text.addMarkup(
+                                m.start(1),
+                                m.end(1),
+                                String.format("<a href='%s' tooltip='%s'>", url, Util.escape(issue.getSummary())),
+                                "</a>");
+                    }
+
+                } else {
+                    LOGGER.log(Level.WARNING, "The Jira pattern ''{0}'' doesn't define a capturing group!", pattern);
+                }
+            }
+
+            if (!issuesToBeSaved.isEmpty()) {
+                LOGGER.log(Level.FINE, "Saving Jira issues");
+                saveIssues(run, a, issuesToBeSaved);
+            }
+        } catch (Exception e) {
+            LOGGER.log(Level.WARNING, "Error annotating of change log", e);
+            throw e;
         }
     }
 
